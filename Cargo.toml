@@ -1,0 +1,11 @@
+[package]
+name = "nes_emulator"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+eframe = { version = "0.31", features = ["default"] }
+egui = "0.31"
+
+[profile.release]
+opt-level = 3
