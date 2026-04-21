@@ -1,48 +1,54 @@
 use eframe::egui;
 use egui::{Color32, Pos2, Rect, Vec2};
 
-const NES_WIDTH: f32 = 256.0;
-const NES_HEIGHT: f32 = 240.0;
-const BALL_SIZE: f32 = 2.0;
-const BALL_SPEED: f32 = 1.5; // pixels per frame
+const NES_WIDTH: u8 = 256;
+const NES_HEIGHT: u8 = 240;
+const BALL_SIZE: u8 = 2;
+const BALL_SPEED: u8 = 1; // pixels per frame
 
 struct NesApp {
-    ball_x: f32,
-    ball_y: f32,
-    vel_x: f32,
-    vel_y: f32,
+    ball_x: u8,
+    ball_y: u8,
+    vel_x: u8,
+    vel_y: u8,
 }
 
 impl NesApp {
     fn new() -> Self {
         Self {
-            ball_x: 0.0,
-            ball_y: 0.0,
+            ball_x: 0,
+            ball_y: 0,
             vel_x: BALL_SPEED,
             vel_y: BALL_SPEED,
         }
     }
 
     fn update_ball(&mut self) {
-        self.ball_x += self.vel_x;
-        self.ball_y += self.vel_y;
+        let current_ball_x = self.ball_x;
+        let current_ball_y = self.ball_y;
+        self.ball_x = self.ball_x.wrapping_add(self.vel_x);
+        self.ball_y = self.ball_y.wrapping_add(self.vel_y);
 
         // Bounce off right/left walls
-        if self.ball_x + BALL_SIZE >= NES_WIDTH {
-            self.ball_x = NES_WIDTH - BALL_SIZE;
-            self.vel_x = -self.vel_x;
-        } else if self.ball_x <= 0.0 {
-            self.ball_x = 0.0;
-            self.vel_x = -self.vel_x;
+        if (current_ball_x & 0x80 == 1)
+            && ((self.ball_x.wrapping_add(BALL_SIZE)) & 0x80 == 0) {
+        //if self.ball_x + BALL_SIZE >= NES_WIDTH {
+            self.ball_x = NES_WIDTH.wrapping_sub(BALL_SIZE);
+            self.vel_x = self.vel_x.wrapping_neg();
+        } else if (current_ball_x & 0x80 == 0)
+            && ((self.ball_x.wrapping_sub(BALL_SIZE)) & 0x80 == 1) {
+            self.ball_x = 0;
+            self.vel_x = self.vel_x.wrapping_neg();
         }
 
         // Bounce off bottom/top walls
         if self.ball_y + BALL_SIZE >= NES_HEIGHT {
-            self.ball_y = NES_HEIGHT - BALL_SIZE;
-            self.vel_y = -self.vel_y;
-        } else if self.ball_y <= 0.0 {
-            self.ball_y = 0.0;
-            self.vel_y = -self.vel_y;
+            self.ball_y = NES_HEIGHT.wrapping_sub(BALL_SIZE);
+            self.vel_y = self.vel_y.wrapping_neg();
+        } else if (current_ball_y & 0x80 == 1)
+            && ((self.ball_y.wrapping_sub(BALL_SIZE)) & 0x80 == 0) {
+            self.ball_y = 0;
+            self.vel_y = self.vel_y.wrapping_neg();
         }
     }
 }
