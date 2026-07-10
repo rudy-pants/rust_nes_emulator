@@ -1,7 +1,7 @@
 use eframe::egui;
 use egui::{Color32, Pos2, Rect, Vec2};
 
-const NES_WIDTH: u8 = 256;
+const NES_WIDTH: u8 = 0; // cannot use 256 because it is too large for u8
 const NES_HEIGHT: u8 = 240;
 const BALL_SIZE: u8 = 2;
 const BALL_SPEED: u8 = 1; // pixels per frame
@@ -24,32 +24,27 @@ impl NesApp {
     }
 
     fn update_ball(&mut self) {
-        let current_ball_x = self.ball_x;
-        let current_ball_y = self.ball_y;
-        self.ball_x = self.ball_x.wrapping_add(self.vel_x);
-        self.ball_y = self.ball_y.wrapping_add(self.vel_y);
+        println!("{}, {}", self.ball_x, self.ball_y);
+        let mut next_ball_x = self.ball_x.wrapping_add(self.vel_x);
+        let mut next_ball_y = self.ball_y.wrapping_add(self.vel_y);
 
         // Bounce off right/left walls
-        if (current_ball_x & 0x80 == 1)
-            && ((self.ball_x.wrapping_add(BALL_SIZE)) & 0x80 == 0) {
-        //if self.ball_x + BALL_SIZE >= NES_WIDTH {
-            self.ball_x = NES_WIDTH.wrapping_sub(BALL_SIZE);
+        // Because NES WIDTH is 256, simply check if overflow happens
+        if (self.ball_x & 0x80) != (next_ball_x & 0x80) {
             self.vel_x = self.vel_x.wrapping_neg();
-        } else if (current_ball_x & 0x80 == 0)
-            && ((self.ball_x.wrapping_sub(BALL_SIZE)) & 0x80 == 1) {
-            self.ball_x = 0;
-            self.vel_x = self.vel_x.wrapping_neg();
+            next_ball_x = self.ball_x.wrapping_add(self.vel_x);
         }
 
         // Bounce off bottom/top walls
-        if self.ball_y + BALL_SIZE >= NES_HEIGHT {
-            self.ball_y = NES_HEIGHT.wrapping_sub(BALL_SIZE);
+        if ((self.ball_y < NES_HEIGHT) && (next_ball_y >= NES_HEIGHT))
+            || ((self.ball_y & 0x80) != (next_ball_y & 0x80))
+        {
             self.vel_y = self.vel_y.wrapping_neg();
-        } else if (current_ball_y & 0x80 == 1)
-            && ((self.ball_y.wrapping_sub(BALL_SIZE)) & 0x80 == 0) {
-            self.ball_y = 0;
-            self.vel_y = self.vel_y.wrapping_neg();
+            next_ball_y = self.ball_y.wrapping_add(self.vel_y);
         }
+
+        self.ball_x = next_ball_x;
+        self.ball_y = next_ball_y;
     }
 }
 
@@ -63,17 +58,14 @@ impl eframe::App for NesApp {
                 let available = ui.available_size();
 
                 // Scale the NES display to fit while maintaining aspect ratio
-                let scale = (available.x / NES_WIDTH).min(available.y / NES_HEIGHT);
-                let display_w = NES_WIDTH * scale;
-                let display_h = NES_HEIGHT * scale;
-
-                // Center the display
-                let offset_x = (available.x - display_w) / 2.0;
-                let offset_y = (available.y - display_h) / 2.0;
+                let scale =
+                    (available.x / f32::from(NES_WIDTH)).min(available.y / f32::from(NES_HEIGHT));
+                let display_w = f32::from(NES_WIDTH) * scale;
+                let display_h = f32::from(NES_HEIGHT) * scale;
 
                 let painter = ui.painter();
                 let panel_rect = ui.max_rect();
-                let origin = panel_rect.min + Vec2::new(offset_x, offset_y);
+                let origin = panel_rect.min;
 
                 // Draw black NES screen background
                 painter.rect_filled(
@@ -85,10 +77,10 @@ impl eframe::App for NesApp {
                 // Draw the ball (scaled to display)
                 let ball_rect = Rect::from_min_size(
                     Pos2::new(
-                        origin.x + self.ball_x * scale,
-                        origin.y + self.ball_y * scale,
+                        origin.x + f32::from(self.ball_x) * scale,
+                        origin.y + f32::from(self.ball_y) * scale,
                     ),
-                    Vec2::splat(BALL_SIZE * scale),
+                    Vec2::splat(f32::from(BALL_SIZE) * scale),
                 );
                 painter.rect_filled(ball_rect, 0.0, Color32::WHITE);
             });
