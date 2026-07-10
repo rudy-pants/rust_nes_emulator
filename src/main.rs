@@ -24,28 +24,29 @@ impl NesApp {
     }
 
     fn update_ball(&mut self) {
-        println!("{}, {}", self.ball_x, self.ball_y);
-        let mut next_ball_x = self.ball_x.wrapping_add(self.vel_x);
-        let mut next_ball_y = self.ball_y.wrapping_add(self.vel_y);
+        let max_x = u8::MAX - (BALL_SIZE - 1);
+        let max_y = NES_HEIGHT - BALL_SIZE;
 
-        // Bounce off right/left walls
-        // Because NES WIDTH is 256, simply check if overflow happens
-        if (self.ball_x & 0x80) != (next_ball_x & 0x80) {
-            self.vel_x = self.vel_x.wrapping_neg();
-            next_ball_x = self.ball_x.wrapping_add(self.vel_x);
-        }
-
-        // Bounce off bottom/top walls
-        if ((self.ball_y < NES_HEIGHT) && (next_ball_y >= NES_HEIGHT))
-            || ((self.ball_y & 0x80) != (next_ball_y & 0x80))
-        {
-            self.vel_y = self.vel_y.wrapping_neg();
-            next_ball_y = self.ball_y.wrapping_add(self.vel_y);
-        }
-
-        self.ball_x = next_ball_x;
-        self.ball_y = next_ball_y;
+        self.ball_x = advance_axis(self.ball_x, &mut self.vel_x, max_x);
+        self.ball_y = advance_axis(self.ball_y, &mut self.vel_y, max_y);
     }
+}
+
+fn advance_axis(position: u8, velocity: &mut u8, max: u8) -> u8 {
+    let forward = *velocity & 0x80 == 0;
+    let speed = if forward {
+        *velocity
+    } else {
+        velocity.wrapping_neg()
+    };
+    // Distance to border
+    let distance = if forward { max - position } else { position };
+
+    if speed > distance {
+        *velocity = velocity.wrapping_neg();
+    }
+
+    position.wrapping_add(*velocity)
 }
 
 impl eframe::App for NesApp {
@@ -58,9 +59,9 @@ impl eframe::App for NesApp {
                 let available = ui.available_size();
 
                 // Scale the NES display to fit while maintaining aspect ratio
-                let scale =
-                    (available.x / f32::from(NES_WIDTH)).min(available.y / f32::from(NES_HEIGHT));
-                let display_w = f32::from(NES_WIDTH) * scale;
+                let nes_width = f32::from(NES_WIDTH.wrapping_sub(1)) + 1.0;
+                let scale = (available.x / nes_width).min(available.y / f32::from(NES_HEIGHT));
+                let display_w = nes_width * scale;
                 let display_h = f32::from(NES_HEIGHT) * scale;
 
                 let painter = ui.painter();
