@@ -1,7 +1,7 @@
 use eframe::egui;
 use egui::{Color32, Pos2, Rect, Vec2};
 
-const NES_WIDTH: u8 = 256;
+const NES_WIDTH: u8 = 0; // cannot use 256 because it is too large for u8
 const NES_HEIGHT: u8 = 240;
 const BALL_SIZE: u8 = 2;
 const BALL_SPEED: u8 = 1; // pixels per frame
@@ -24,33 +24,29 @@ impl NesApp {
     }
 
     fn update_ball(&mut self) {
-        let current_ball_x = self.ball_x;
-        let current_ball_y = self.ball_y;
-        self.ball_x = self.ball_x.wrapping_add(self.vel_x);
-        self.ball_y = self.ball_y.wrapping_add(self.vel_y);
+        let max_x = u8::MAX - (BALL_SIZE - 1);
+        let max_y = NES_HEIGHT - BALL_SIZE;
 
-        // Bounce off right/left walls
-        if (current_ball_x & 0x80 == 1)
-            && ((self.ball_x.wrapping_add(BALL_SIZE)) & 0x80 == 0) {
-        //if self.ball_x + BALL_SIZE >= NES_WIDTH {
-            self.ball_x = NES_WIDTH.wrapping_sub(BALL_SIZE);
-            self.vel_x = self.vel_x.wrapping_neg();
-        } else if (current_ball_x & 0x80 == 0)
-            && ((self.ball_x.wrapping_sub(BALL_SIZE)) & 0x80 == 1) {
-            self.ball_x = 0;
-            self.vel_x = self.vel_x.wrapping_neg();
-        }
-
-        // Bounce off bottom/top walls
-        if self.ball_y + BALL_SIZE >= NES_HEIGHT {
-            self.ball_y = NES_HEIGHT.wrapping_sub(BALL_SIZE);
-            self.vel_y = self.vel_y.wrapping_neg();
-        } else if (current_ball_y & 0x80 == 1)
-            && ((self.ball_y.wrapping_sub(BALL_SIZE)) & 0x80 == 0) {
-            self.ball_y = 0;
-            self.vel_y = self.vel_y.wrapping_neg();
-        }
+        self.ball_x = advance_axis(self.ball_x, &mut self.vel_x, max_x);
+        self.ball_y = advance_axis(self.ball_y, &mut self.vel_y, max_y);
     }
+}
+
+fn advance_axis(position: u8, velocity: &mut u8, max: u8) -> u8 {
+    let forward = *velocity & 0x80 == 0;
+    let speed = if forward {
+        *velocity
+    } else {
+        velocity.wrapping_neg()
+    };
+    // Distance to border
+    let distance = if forward { max - position } else { position };
+
+    if speed > distance {
+        *velocity = velocity.wrapping_neg();
+    }
+
+    position.wrapping_add(*velocity)
 }
 
 impl eframe::App for NesApp {
@@ -63,17 +59,14 @@ impl eframe::App for NesApp {
                 let available = ui.available_size();
 
                 // Scale the NES display to fit while maintaining aspect ratio
-                let scale = (available.x / NES_WIDTH).min(available.y / NES_HEIGHT);
-                let display_w = NES_WIDTH * scale;
-                let display_h = NES_HEIGHT * scale;
-
-                // Center the display
-                let offset_x = (available.x - display_w) / 2.0;
-                let offset_y = (available.y - display_h) / 2.0;
+                let nes_width = f32::from(NES_WIDTH.wrapping_sub(1)) + 1.0;
+                let scale = (available.x / nes_width).min(available.y / f32::from(NES_HEIGHT));
+                let display_w = nes_width * scale;
+                let display_h = f32::from(NES_HEIGHT) * scale;
 
                 let painter = ui.painter();
                 let panel_rect = ui.max_rect();
-                let origin = panel_rect.min + Vec2::new(offset_x, offset_y);
+                let origin = panel_rect.min;
 
                 // Draw black NES screen background
                 painter.rect_filled(
@@ -85,10 +78,10 @@ impl eframe::App for NesApp {
                 // Draw the ball (scaled to display)
                 let ball_rect = Rect::from_min_size(
                     Pos2::new(
-                        origin.x + self.ball_x * scale,
-                        origin.y + self.ball_y * scale,
+                        origin.x + f32::from(self.ball_x) * scale,
+                        origin.y + f32::from(self.ball_y) * scale,
                     ),
-                    Vec2::splat(BALL_SIZE * scale),
+                    Vec2::splat(f32::from(BALL_SIZE) * scale),
                 );
                 painter.rect_filled(ball_rect, 0.0, Color32::WHITE);
             });
